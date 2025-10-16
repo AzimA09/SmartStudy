@@ -25,7 +25,7 @@ Relies on the Profile system for saving schedules per user.
 
 ---
 
-## Feature 2: Individual Profile Creation  *(Student 4)*
+## Feature 2: Individual Profile Creation
 
 **Description:**  
 Users can create and log into their own accounts, allowing them to securely store schedules, reminders, and preferences.
