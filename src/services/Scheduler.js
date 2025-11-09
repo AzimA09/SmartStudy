@@ -1,4 +1,4 @@
- # scheduler.py
+# scheduler.py
 from datetime import datetime, timedelta
 
 class Event:
@@ -18,20 +18,18 @@ class StudyPlan:
 
     def add_event(self, event):
         """Add event and adjust plan if needed"""
-        # Insert event
         self.events.append(event)
-        # Adjust conflicting events
         self.adjust_conflicts()
 
     def adjust_conflicts(self):
         """Automatically adjust events to prevent overlaps"""
-        # Sort by start time
+        # Sort events by start time
         self.events.sort(key=lambda e: e.start)
         for i in range(len(self.events)-1):
             current = self.events[i]
             next_event = self.events[i+1]
             if current.conflicts_with(next_event):
-                # Move the next event to the first available slot after current event
+                # Move the next event to the first available slot after current
                 duration = next_event.end - next_event.start
                 next_event.start = current.end + timedelta(minutes=5)  # 5 min buffer
                 next_event.end = next_event.start + duration
@@ -41,15 +39,29 @@ class StudyPlan:
         for event in self.events:
             print(f"{event.title}: {event.start.strftime('%Y-%m-%d %H:%M')} - {event.end.strftime('%Y-%m-%d %H:%M')}")
 
-# Example Usage
+# Function for Story 1 integration
+def get_class_work_schedule():
+    """
+    This function will be implemented in Story 1.
+    For now, it just returns an empty list.
+    """
+    return []
+
+# Test Story 2
 if __name__ == "__main__":
     plan = StudyPlan()
 
-    # Existing class/work schedule (would come from Story 1)
-    plan.add_event(Event("Math Class", datetime(2025,11,10,9,0), datetime(2025,11,10,10,0)))
-    plan.add_event(Event("Work Shift", datetime(2025,11,10,10,30), datetime(2025,11,10,13,0)))
+    # Get class/work schedule from Story 1 (currently empty)
+    initial_events = get_class_work_schedule()
+    for event in initial_events:
+        plan.add_event(event)
 
-    # New study session that conflicts with class
-    plan.add_event(Event("Study Chemistry", datetime(2025,11,10,9,30), datetime(2025,11,10,11,0)))
+    # Example: adding a study session
+    study_event = Event(
+        title="Study Chemistry",
+        start=datetime(2025, 11, 10, 9, 30),
+        end=datetime(2025, 11, 10, 11, 0)
+    )
+    plan.add_event(study_event)
 
     plan.show_schedule()
