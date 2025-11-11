@@ -1,45 +1,83 @@
 # scheduler.py
 from datetime import datetime, timedelta
+from typing import List, Dict, Any
 from class_schedule import get_class_work_schedule  # Import Story 1's real implementation
 
 class Event:
-    def __init__(self, title, start, end, priority=1):
+    def __init__(self, title: str, start: datetime, end: datetime, priority: int = 1, event_type: str = "study"):
         self.title = title
         self.start = start  # datetime object
         self.end = end      # datetime object
         self.priority = priority  # higher number = higher priority
+        self.type = event_type    # "class", "work", "study"
+        self.conflicts = False    # Story 3 flag
+        self.conflict_info: str | None = None 
 
-    def conflicts_with(self, other):
-        """Check if two events overlap"""
+    def conflicts_with(self, other: "Event") -> bool:
+        """Return True if two events overlap in time"""
         return self.start < other.end and other.start < self.end
 
+    def __repr__(self) -> str:
+        status = " (CONFLICT!)" if self.conflicts else ""
+        return ( f"{self.type.upper()} {self.title}: "
+                f"{self.start.strftime('%Y-%m-%d %H:%M')} - "
+                f"{self.end.strftime('%H:%M')}{status}")
+
 class StudyPlan:
+    """Manages all scheduled events and detects or resolves conflicts."""
     def __init__(self):
-        self.events = []  # list of Event objects
+        self.events: List[Event] = []  # list of Event objects
 
-    def add_event(self, event):
-        """Add event and adjust plan if needed"""
+    def add_event(self, event: Event) -> List[Dict[str, Any]]:
+        """Add event and adjust plan if needed, Returns a list of conflict reports (empty if none)."""
         self.events.append(event)
-        self.adjust_conflicts()
+        return self._resolve_conflicts()
 
-    def adjust_conflicts(self):
-        """Automatically adjust events to prevent overlaps"""
-        self.events.sort(key=lambda e: e.start)
+    def _resolve_conflicts(self) -> List[Dict[str, Any]]:
+        """Detect and resolve event overlaps by shifting lower-priority events."""
+        self.events.sort(key=lambda e: (e.start, -e.priority))
+        conflict_reports: List[Dict[str, Any]] = []
         for i in range(len(self.events)-1):
             current = self.events[i]
             next_event = self.events[i+1]
-            if current.conflicts_with(next_event):
-                duration = next_event.end - next_event.start
-                next_event.start = current.end + timedelta(minutes=5)
-                next_event.end = next_event.start + duration
+            if not current.conflicts_with(next_event):
+                continue
+            next_event.conflicts = True
+            old_start = next_event.start
+            duration = next_event.end - next_event.start
+            buffer = timedelta(minutes=5)
+            if next_event.priority <= current.priority:
+                """ Shift the lower-priority event after the current one. """
+                shift = current.end - next_event.start + buffer
+                next_event.start += shift
+                next_event.end += shift
+            else:
+                shift = next_event.end - current.start + buffer
+                current.start += shift
+                current.end += shift
+            msg = (
+                f"'{next_event.title}' overlapped with '{current.title}'. "
+                f"Shifted from {old_start.strftime('%H:%M')} to {next_event.start.strftime('%H:%M')}."
+            )
+            next_event.conflict_info = msg
+            conflict_reports.append({
+                "event": next_event.title,
+                "conflicts_with": current.title,
+                "original_start": old_start,
+                "new_start": next_event.start,
+                "message": msg
+            })
+        return conflict_reports
 
-    def show_schedule(self):
+    def show_schedule(self) -> None:
         """Print the current study plan"""
-        for event in self.events:
-            print(f"{event.title}: {event.start.strftime('%Y-%m-%d %H:%M')} - {event.end.strftime('%Y-%m-%d %H:%M')}")
+        print("\n=== SmartStudy Schedule ===")
+        for e in self.events:
+            print(e)
+        print("=" * 40)
 
 # -------------------------
-# Test Story 2
+# Test Story 2 & 3
 # -------------------------
 if __name__ == "__main__":
     plan = StudyPlan()
