@@ -69,6 +69,22 @@ class StudyPlan:
             })
         return conflict_reports
 
+    def refresh_study_plan(self, updated_event: Event) -> None:
+        print(f"\n[Dynamic Update Triggered] '{updated_event.title}' has been updated. Refreshing study plan...\n")
+
+        """Remove old version of the event"""
+        self.events = [e for e in self.events if e.title != updated_event.title]
+
+        """Add updated event and re-sort"""
+        self.events.append(updated_event)
+        self.events.sort(key=lambda e: (e.start, -e.priority))
+
+        """Re-run conflict resolution"""
+        self._resolve_conflicts()
+
+        """Confirmation message"""
+        print(f"Study plan successfully refreshed for '{updated_event.title}'\n")
+
     def show_schedule(self) -> None:
         """Print the current study plan"""
         print("\n=== SmartStudy Schedule ===")
@@ -77,7 +93,7 @@ class StudyPlan:
         print("=" * 40)
 
 # -------------------------
-# Test Story 2 & 3
+# Test Story 2 & 3 & 4
 # -------------------------
 if __name__ == "__main__":
     plan = StudyPlan()
@@ -96,3 +112,16 @@ if __name__ == "__main__":
     plan.add_event(study_event)
 
     plan.show_schedule()
+
+    print("\n--- Updating 'Study Chemistry' event time ---")
+
+    updated_event = Event(
+        title="Study Chemistry",
+        start=datetime(2025, 11, 10, 10, 30),  # new start time
+        end=datetime(2025, 11, 10, 12, 0),     # new end time
+        event_type="study"
+    )
+
+    plan.refresh_study_plan(updated_event)
+    plan.show_schedule()
+
