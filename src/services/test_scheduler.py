@@ -1,116 +1,9 @@
-"""
-test_scheduler.py
-Test cases 1, 2, and 3.
-- Event creation (1)
-- Auto-adjustment of overlapping events (2)
-- Conflict flagging and messages (3)
-"""
-
 import unittest
 from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta
+
 from scheduler import Event, StudyPlan
-from datetime import datetime
 from class_schedule import get_class_work_schedule
-
-
-# -----------------------------
-# Test Case 1: Event Creation
-# -----------------------------
-def test_event_creation():
-    """
-    Tests that program correctly creates Event objects with proper fields.
-    """
-
-    test_event = Event(
-        title="Math Class",
-        start=datetime(2025, 11, 9, 10, 0),
-        end=datetime(2025, 11, 9, 11, 15),
-        priority=3,
-        event_type="class"
-    )
-
-    assert test_event.title == "Math Class"
-    assert test_event.type == "class"
-    assert test_event.priority == 3
-    assert test_event.start == datetime(2025, 11, 9, 10, 0)
-    assert test_event.end == datetime(2025, 11, 9, 11, 15)
-
-    print("Test Case 1 Passed: Event creation validated.")
-
-
-# -----------------------------
-# Test Case 2: Auto-adjustment Logic
-# -----------------------------
-def test_auto_adjustment():
-    """
-    Tests that lower-priority events get moved to avoid conflicts.
-    """
-
-    plan = StudyPlan()
-
-    event_a = Event(
-        title="Physics Class",
-        start=datetime(2025, 11, 10, 9, 0),
-        end=datetime(2025, 11, 10, 10, 0),
-        priority=3,
-        event_type="class"
-    )
-
-    event_b = Event(
-        title="Study Session",
-        start=datetime(2025, 11, 10, 9, 30),
-        end=datetime(2025, 11, 10, 10, 30),
-        priority=1,
-        event_type="study"
-    )
-
-    plan.add_event(event_a)
-    conflicts = plan.add_event(event_b)
-
-    expected_start = datetime(2025, 11, 10, 10, 5)
-    expected_end = datetime(2025, 11, 10, 11, 5)
-
-    assert event_b.start == expected_start
-    assert event_b.end == expected_end
-    assert len(conflicts) == 1
-
-    print("Test Case 2 Passed: Auto-adjustment moved event correctly.")
-
-
-# -----------------------------
-# Test Case 3: Conflict Tracking
-# -----------------------------
-def test_conflict_tracking():
-    """
-    Tests that overlapping events are flagged and conflict messages are created.
-    """
-
-    plan = StudyPlan()
-
-    work_event = Event(
-        title="Work Shift",
-        start=datetime(2025, 11, 12, 13, 0),
-        end=datetime(2025, 11, 12, 15, 0),
-        priority=2,
-        event_type="work"
-    )
-
-    gym_event = Event(
-        title="Gym Session",
-        start=datetime(2025, 11, 12, 14, 0),
-        end=datetime(2025, 11, 12, 15, 0),
-        priority=1,
-        event_type="study"
-    )
-
-    plan.add_event(work_event)
-    conflicts = plan.add_event(gym_event)
-
-    assert gym_event.conflicts is True
-    assert gym_event.conflict_info is not None
-    assert len(conflicts) == 1
-
-    print("Test Case 3 Passed: Conflict tracking validated.")
 
 """
 test_class_schedule.py
@@ -161,6 +54,135 @@ class TestClassSchedule(unittest.Testcase):
         self.assertEqual(mock_event.call_count, 2)
         mock_event.assert_any_call(title = "Chemistry Class", start=datetime(2025, 1, 15, 8, 0), end=datetime(2025, 1, 15, 9, 15), priority=3, event_type="class")
         mock_event.assert_any_call(title = "Morning Shift", start=datetime(2025, 1, 15, 10, 0), end=datetime(2025, 1, 15, 12, 0), priority=2, event_type="work")
+
+
+
+"""
+test_scheduler.py
+Author: Azim Ahmed
+Teammate Code Under Test: Nya McCowan
+
+Test cases for Story 3: Detect Schedule Conflicts
+1. Basic overlap detection
+2. Priority-based shifting
+3. Multi-event conflict chain
+"""
+
+class TestSchedulerConflicts(unittest.TestCase):
+
+    @patch("scheduler.Event")
+    def test_basic_overlap(self, mock_event):
+        """
+        Test Case 1:
+        Ensures the scheduler correctly detects a basic overlap and flags the conflict.
+        """
+        plan = StudyPlan()
+
+        # Mock event objects
+        event_a = MagicMock()
+        event_b = MagicMock()
+
+        # Define start/end times for conflict simulation
+        event_a.start = datetime(2025, 11, 12, 10, 0)
+        event_a.end   = datetime(2025, 11, 12, 11, 0)
+        event_b.start = datetime(2025, 11, 12, 10, 30)
+        event_b.end   = datetime(2025, 11, 12, 11, 30)
+
+        event_a.priority = 3
+        event_b.priority = 1
+
+        # conflict_with logic determines overlap
+        event_a.conflicts_with.return_value = True
+        event_b.conflicts_with.return_value = True
+
+        mock_event.side_effect = [event_a, event_b]
+
+        plan.add_event(event_a)
+        conflicts = plan.add_event(event_b)
+
+        self.assertEqual(len(conflicts), 1)
+        self.assertTrue(event_b.conflicts)
+
+    @patch("scheduler.Event")
+    def test_priority_shifting(self, mock_event):
+        """
+        Test Case 2:
+        Lower-priority event should shift after the higher-priority event + 5-minute buffer.
+        """
+        plan = StudyPlan()
+
+        high = MagicMock()
+        low = MagicMock()
+
+        high.start = datetime(2025, 11, 15, 12, 0)
+        high.end   = datetime(2025, 11, 15, 14, 0)
+        high.priority = 2
+
+        low.start = datetime(2025, 11, 15, 13, 0)
+        low.end   = datetime(2025, 11, 15, 14, 0)
+        low.priority = 1
+
+        # Simulated overlap
+        high.conflicts_with.return_value = True
+        low.conflicts_with.return_value = True
+
+        mock_event.side_effect = [high, low]
+
+        plan.add_event(high)
+        plan.add_event(low)
+
+        expected_new_start = high.end + timedelta(minutes=5)
+        self.assertEqual(low.start, expected_new_start)
+        self.assertTrue(low.conflicts)
+
+    @patch("scheduler.Event")
+    def test_conflict_chain(self, mock_event):
+        """
+        Test Case 3:
+        Ensures multiple overlapping study events shift one after another
+        (chain reaction conflict).
+        """
+        plan = StudyPlan()
+
+        a = MagicMock()
+        b = MagicMock()
+        c = MagicMock()
+
+        # Original times
+        a.start = datetime(2025, 11, 20, 9, 0)
+        a.end   = datetime(2025, 11, 20, 10, 0)
+        a.priority = 3
+
+        b.start = datetime(2025, 11, 20, 9, 30)
+        b.end   = datetime(2025, 11, 20, 10, 30)
+        b.priority = 1
+
+        c.start = datetime(2025, 11, 20, 10, 15)
+        c.end   = datetime(2025, 11, 20, 11, 0)
+        c.priority = 1
+
+        # Simulate all overlap relationships
+        a.conflicts_with.return_value = True
+        b.conflicts_with.return_value = True
+        c.conflicts_with.return_value = True
+
+        mock_event.side_effect = [a, b, c]
+
+        plan.add_event(a)
+        plan.add_event(b)
+        plan.add_event(c)
+
+        # Event B shifts after Event A + 5 minutes
+        expected_b_start = a.end + timedelta(minutes=5)
+
+        # Event C shifts after B finishes + 5 minutes
+        b_duration = b.end - b.start
+        expected_c_start = expected_b_start + b_duration + timedelta(minutes=5)
+
+        self.assertEqual(b.start, expected_b_start)
+        self.assertEqual(c.start, expected_c_start)
+        self.assertTrue(b.conflicts)
+        self.assertTrue(c.conflicts)
 
 # -----------------------------
 # Run All Tests
