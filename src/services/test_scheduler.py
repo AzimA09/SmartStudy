@@ -6,8 +6,11 @@ Test cases 1, 2, and 3.
 - Conflict flagging and messages (3)
 """
 
+import unittest
+from unittest.mock import patch, MagicMock
 from scheduler import Event, StudyPlan
 from datetime import datetime
+from class_schedule import get_class_work_schedule
 
 
 # -----------------------------
@@ -109,15 +112,58 @@ def test_conflict_tracking():
 
     print("Test Case 3 Passed: Conflict tracking validated.")
 
+"""
+test_class_schedule.py
+Author: Nya McCowan
+Teammates Code: Maija Hirata
+
+Test cases for get_class_work_schedule():
+1. Adding a single class event
+2. Adding a single work event
+3. Adding two events consecutively
+"""
+class TestClassSchedule(unittest.Testcase):
+
+    @patch("class_schedule.Event")
+    @patch("builtins.input")
+    def test_add_one_class_event(self, mock_input, mock_event):
+        """
+        Test adding exactly one CLASS event.
+        """
+        mock_input.side_effect = ["Math Class", "class", "2025-02-10", "09:00", "10:15", "n"] 
+        mock_event.return_value = MagicMock()
+        schedule = get_class_work_schedule()
+        self.assertEqual(len(schedule), 1)
+        mock_event.assert_called_with(title = "Math Class", start=datetime(2025, 2, 10, 9, 0), end=datetime(2025, 2, 10, 10, 15), priority=3, event_type="class")
+
+    @patch("class_schedule.Event")
+    @patch("builtins.input")
+    def test_add_one_work_event(self, mock_input, mock_event):
+        """
+        Test adding exactly one WORK event.
+        """
+        mock_input.side_effect = ["Work Shift", "work", "2025-03-01", "14:00", "18:00", "n"] 
+        mock_event.return_value = MagicMock()
+        schedule = get_class_work_schedule()
+        self.assertEqual(len(schedule), 1)
+        mock_event.assert_called_with(title = "Work Shift", start=datetime(2025, 3, 1, 14, 0), end=datetime(2025, 3, 1, 18, 0), priority=2, event_type="work")
+
+    @patch("class_schedule.Event")
+    @patch("builtins.input")
+    def test_add_two_events(self, mock_input, mock_event):
+        """
+        Test that two events can be added consecutively.
+        """
+        mock_input.side_effect = ["Chemistry Class", "class", "2025-01-15", "08:00", "09:15", "y", "Morning Shift", "work", "2025-01-15", "10:00", "12:00", "n"] 
+        mock_event.side_effect = [MagicMock(), MagicMock()]
+        schedule = get_class_work_schedule()
+        self.assertEqual(len(schedule), 2)
+        self.assertEqual(mock_event.call_count, 2)
+        mock_event.assert_any_call(title = "Chemistry Class", start=datetime(2025, 1, 15, 8, 0), end=datetime(2025, 1, 15, 9, 15), priority=3, event_type="class")
+        mock_event.assert_any_call(title = "Morning Shift", start=datetime(2025, 1, 15, 10, 0), end=datetime(2025, 1, 15, 12, 0), priority=2, event_type="work")
 
 # -----------------------------
 # Run All Tests
 # -----------------------------
 if __name__ == "__main__":
-    print("Running SmartStudy test suite...\n")
-
-    test_event_creation()
-    test_auto_adjustment()
-    test_conflict_tracking()
-
-    print("\nAll tests passed successfully!")
+    unittest.main()
