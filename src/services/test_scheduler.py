@@ -55,7 +55,104 @@ class TestClassSchedule(unittest.Testcase):
         mock_event.assert_any_call(title = "Chemistry Class", start=datetime(2025, 1, 15, 8, 0), end=datetime(2025, 1, 15, 9, 15), priority=3, event_type="class")
         mock_event.assert_any_call(title = "Morning Shift", start=datetime(2025, 1, 15, 10, 0), end=datetime(2025, 1, 15, 12, 0), priority=2, event_type="work")
 
+"""
+test_automatic_schedule_adjustment.py
+Author: Maija Hirata
+Teammate Code Under Test: Samantha Reilly
 
+Test cases for Story 2: Automatic Schedule Adjustment
+1. Test priority ordering 
+2. Non conflicting events times should not change
+3. Verify chain reaction shifting
+"""
+
+class TestAutomaticScheduleAdjustment(unittest.TestCase):
+
+    def test_single_overlap_shift(self):
+        """
+        When two events overlap, the lower-priority event
+        is automatically shifted after the higher-priority event + 5 min.
+        """
+        plan = StudyPlan()
+
+        high = Event(
+            title="High Priority",
+            start=datetime(2025, 5, 1, 10, 0),
+            end=datetime(2025, 5, 1, 11, 0),
+            priority=3
+        )
+        low = Event(
+            title="Low Priority",
+            start=datetime(2025, 5, 1, 10, 30),
+            end=datetime(2025, 5, 1, 11, 30),
+            priority=1
+        )
+
+        plan.add_event(high)
+        conflicts = plan.add_event(low)
+
+        expected_start = high.end + timedelta(minutes=5)
+        expected_end = expected_start + (low.end - low.start)
+
+        self.assertEqual(low.start, expected_start)
+        self.assertEqual(low.end, expected_end)
+        self.assertTrue(low.conflicts)
+        self.assertEqual(len(conflicts), 1)
+
+    def test_no_shift_when_no_conflict(self):
+        """
+        Events that do not overlap should NOT be modified.
+        """
+        plan = StudyPlan()
+
+        a = Event(
+            title="Event A",
+            start=datetime(2025, 6, 1, 8, 0),
+            end=datetime(2025, 6, 1, 9, 0)
+        )
+        b = Event(
+            title="Event B",
+            start=datetime(2025, 6, 1, 9, 30),
+            end=datetime(2025, 6, 1, 10, 0)
+        )
+
+        original_b_start = b.start
+        plan.add_event(a)
+        conflicts = plan.add_event(b)
+
+        self.assertEqual(b.start, original_b_start)
+        self.assertEqual(len(conflicts), 0)
+        self.assertFalse(b.conflicts)
+
+    def test_multi_event_chain_shift(self):
+        """
+        If multiple events overlap in sequence,
+        each one should shift after the previous adjusted event.
+        """
+        plan = StudyPlan()
+
+        A = Event("A", datetime(2025,8,1,9,0), datetime(2025,8,1,10,0), priority=3)
+        B = Event("B", datetime(2025,8,1,9,30), datetime(2025,8,1,10,30), priority=1)
+        C = Event("C", datetime(2025,8,1,10,15), datetime(2025,8,1,11,0), priority=1)
+
+        plan.add_event(A)
+        plan.add_event(B)
+        plan.add_event(C)
+
+        # B shifts after A
+        expected_B_start = A.end + timedelta(minutes=5)
+        expected_B_end   = expected_B_start + timedelta(hours=1)
+        self.assertEqual(B.start, expected_B_start)
+        self.assertEqual(B.end, expected_B_end)
+
+        # C shifts after B
+        expected_C_start = expected_B_end + timedelta(minutes=5)
+        expected_C_end = expected_C_start + timedelta(minutes=45)
+        self.assertEqual(C.start, expected_C_start)
+        self.assertEqual(C.end, expected_C_end)
+
+        self.assertTrue(B.conflicts)
+        self.assertTrue(C.conflicts)
 
 """
 test_scheduler.py
