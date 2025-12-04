@@ -183,6 +183,116 @@ class TestSchedulerConflicts(unittest.TestCase):
         self.assertEqual(c.start, expected_c_start)
         self.assertTrue(b.conflicts)
         self.assertTrue(c.conflicts)
+"""
+test_studyplan_refresh.py
+Author: Samantha Reilly
+Teammate Code Under Test: Azim Ahmed
+
+Test cases for Story 4: Dynamic Refresh of Study Plan
+1. Updating an event replaces the old instance
+2. Updating an event resorts the schedule
+3. Updating an event triggers conflict resolution
+"""
+class TestStudyPlanRefresh(unittest.TestCase):
+
+    @patch("scheduler.Event")
+    def test_replace_old_event(self, mock_event):
+        """
+        Test Case 1:
+        Updating an existing event should remove the old
+        instance and insert the updated version.
+        """
+        plan = StudyPlan()
+
+        old = MagicMock()
+        updated = MagicMock()
+
+        old.title = "Study Chemistry"
+        updated.title = "Study Chemistry"
+
+        plan.add_event(old)
+
+        plan.refresh_study_plan(updated)
+
+        # Only updated event should remain
+        self.assertEqual(len(plan.events), 1)
+        self.assertIs(plan.events[0], updated)
+
+    @patch("scheduler.Event")
+    def test_resort_after_update(self, mock_event):
+        """
+        Test Case 2:
+        Updating an event should trigger re-sorting of the study plan.
+        """
+        plan = StudyPlan()
+
+        e1 = MagicMock()
+        e2 = MagicMock()
+        updated = MagicMock()
+
+        e1.title = "Math Study"
+        e2.title = "Study Chemistry"
+        updated.title = "Study Chemistry"
+
+        # Original ordering
+        e1.start = datetime(2025, 11, 10, 8, 0)
+        e2.start = datetime(2025, 11, 10, 9, 0)
+
+        # Updated event moves earlier
+        updated.start = datetime(2025, 11, 10, 7, 30)
+
+        plan.add_event(e1)
+        plan.add_event(e2)
+
+        plan.refresh_study_plan(updated)
+
+        self.assertEqual(plan.events[0], updated)
+        self.assertEqual(plan.events[1], e1)
+
+    @patch("scheduler.Event")
+    def test_conflict_resolution_after_update(self, mock_event):
+        """
+        Test Case 3:
+        Updating an event should retrigger the conflict resolver
+        and shift overlapping lower-priority events.
+        """
+        plan = StudyPlan()
+
+        a = MagicMock()
+        b = MagicMock()
+        updated = MagicMock()
+
+        # Event A (higher priority)
+        a.title = "Event A"
+        a.priority = 3
+        a.start = datetime(2025, 12, 1, 9, 0)
+        a.end   = datetime(2025, 12, 1, 10, 0)
+
+        # Original B (lower priority)
+        b.title = "Study Chemistry"
+        b.priority = 1
+        b.start = datetime(2025, 12, 1, 10, 15)
+        b.end   = datetime(2025, 12, 1, 11, 0)
+
+        # Updated B overlaps A
+        updated.title = "Study Chemistry"
+        updated.priority = 1
+        updated.start = datetime(2025, 12, 1, 9, 30)
+        updated.end   = datetime(2025, 12, 1, 11, 0)
+
+        # Simulate overlap logic
+        a.conflicts_with.return_value = True
+        updated.conflicts_with.return_value = True
+
+        plan.add_event(a)
+        plan.add_event(b)
+
+        plan.refresh_study_plan(updated)
+
+        expected_start = a.end + timedelta(minutes=5)
+
+        self.assertEqual(updated.start, expected_start)
+        self.assertTrue(updated.conflicts)
 
 # -----------------------------
 # Run All Tests
